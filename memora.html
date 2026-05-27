@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Memora — Записи захоронений</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  /* Основные цвета */
+  --plum:       #5B4B7A;
+  --plum-dark:  #3D2E5C;
+  --plum-deep:  #2A1F3D;
+  --iris:       #9B8BBF;
+  --fog:        #F0ECF8;
+  --fog-mid:    #E2DAF0;
+  /* Тёплая база */
+  --parchment:  #F5F0E8;
+  --linen:      #D9CDB8;
+  --sepia:      #8A7B6E;
+  --oak:        #2C2018;
+  --oak-mid:    #5C4A2A;
+  /* Служебные */
+  --white:      #ffffff;
+  --red:        #8B2A2A;
+  --r:          12px;
+  --rs:         8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:var(--parchment);color:var(--oak);font-size:15px;}
+body{display:flex;flex-direction:column;font-family:'Inter',sans-serif;}
+
+/* ── HEADER ── */
+.header{background:var(--plum-deep);padding:13px 16px 11px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.header-back{color:var(--fog);font-size:26px;cursor:pointer;display:none;line-height:1;font-family:'Cormorant Garamond',serif;}
+.header-text{flex:1;}
+.header-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--fog);letter-spacing:.4px;line-height:1;}
+.header-sub{font-size:10px;color:rgba(240,236,248,.55);margin-top:3px;letter-spacing:.2px;}
+.header-count{background:rgba(240,236,248,.15);color:var(--fog);font-size:11px;padding:3px 10px;border-radius:99px;white-space:nowrap;font-family:'Inter',sans-serif;}
+
+/* ── TABS ── */
+.tabs{display:flex;background:var(--plum-deep);border-bottom:1px solid rgba(155,139,191,.25);flex-shrink:0;}
+.tab{flex:1;padding:9px 4px 8px;text-align:center;font-size:10px;color:var(--iris);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;user-select:none;font-family:'Inter',sans-serif;}
+.tab.active{color:var(--fog);border-bottom-color:var(--fog);}
+.tab-icon{font-size:18px;display:block;margin-bottom:2px;}
+
+/* ── LAYOUT ── */
+.main{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.screen{display:none;flex:1;flex-direction:column;overflow:hidden;}
+.screen.active{display:flex;}
+
+/* ── SEARCH ── */
+.search-top{flex-shrink:0;background:var(--white);border-bottom:1px solid var(--linen);}
+.search-bar{padding:10px 16px;display:flex;gap:8px;}
+.search-input{flex:1;padding:9px 14px;border:1px solid var(--linen);border-radius:var(--rs);font-size:14px;background:var(--parchment);color:var(--oak);outline:none;font-family:'Inter',sans-serif;}
+.search-input:focus{border-color:var(--plum);}
+.search-results{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+
+.sort-bar{display:flex;gap:6px;padding:0 16px 10px;overflow-x:auto;}
+.sort-bar::-webkit-scrollbar{display:none;}
+.sort-chip{padding:5px 14px;border-radius:99px;font-size:12px;border:1px solid var(--linen);white-space:nowrap;cursor:pointer;color:var(--sepia);background:var(--white);flex-shrink:0;font-family:'Inter',sans-serif;}
+.sort-chip.active{background:var(--fog);color:var(--plum);border-color:var(--plum);font-weight:500;}
+
+.grave-item{background:var(--white);border-bottom:1px solid var(--linen);padding:13px 16px;display:flex;gap:12px;cursor:pointer;}
+.grave-item:active{background:var(--parchment);}
+.grave-avatar{width:44px;height:44px;border-radius:var(--rs);background:var(--fog);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;color:var(--plum);flex-shrink:0;text-transform:uppercase;}
+.grave-info{flex:1;min-width:0;}
+.grave-name{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;color:var(--oak);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.grave-dates{font-size:12px;color:var(--sepia);margin-top:2px;}
+.grave-sector{font-size:11px;color:var(--sepia);margin-top:2px;}
+.grave-arrow{color:var(--iris);font-size:20px;align-self:center;}
+
+.empty-state{padding:60px 20px;text-align:center;color:var(--sepia);}
+.empty-icon{font-size:44px;margin-bottom:12px;}
+.empty-title{font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--oak);margin-bottom:6px;}
+.empty-sub{font-size:13px;line-height:1.6;}
+.loading{padding:40px;text-align:center;color:var(--sepia);}
+.spinner{width:28px;height:28px;border:2px solid var(--linen);border-top-color:var(--plum);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── ADD ── */
+.add-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;}
+.field-group{margin-bottom:14px;}
+.field-label{font-size:12px;color:var(--sepia);margin-bottom:5px;font-weight:500;letter-spacing:.2px;}
+.field-input{width:100%;padding:10px 14px;border:1px solid var(--linen);border-radius:var(--rs);font-size:14px;color:var(--oak);background:var(--white);outline:none;font-family:'Inter',sans-serif;}
+.field-input:focus{border-color:var(--plum);}
+.field-row{display:flex;gap:10px;}
+.field-row .field-group{flex:1;}
+
+.photos-section{margin-bottom:14px;}
+.photos-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;}
+.photos-scroll::-webkit-scrollbar{display:none;}
+.photo-thumb{width:80px;height:80px;border-radius:var(--rs);object-fit:cover;flex-shrink:0;border:1px solid var(--linen);}
+.photo-add-btn{width:80px;height:80px;border-radius:var(--rs);border:1.5px dashed var(--linen);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:3px;flex-shrink:0;background:var(--white);}
+.photo-add-btn:active{background:var(--parchment);}
+.photo-add-btn span{font-size:22px;}
+.photo-add-btn small{font-size:10px;color:var(--sepia);}
+.photo-locked{width:80px;height:80px;border-radius:var(--rs);border:1.5px dashed var(--iris);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;flex-shrink:0;cursor:pointer;background:var(--fog);}
+.photo-locked span{font-size:20px;}
+.photo-locked small{font-size:9px;color:var(--plum);text-align:center;line-height:1.3;}
+.photo-banner{padding:8px 12px;border-radius:var(--rs);font-size:12px;margin-bottom:10px;line-height:1.5;}
+.photo-banner.free{background:var(--fog);color:var(--plum);border:1px solid var(--fog-mid);}
+.photo-banner.paid{background:#FDF3E3;color:var(--oak-mid);border:1px solid var(--linen);}
+
+.banner{border-radius:var(--rs);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.5;}
+.banner-free{background:var(--fog);color:var(--plum);border:1px solid var(--fog-mid);}
+.banner-paid{background:#FDF3E3;color:var(--oak-mid);border:1px solid var(--linen);}
+
+.gps-section{margin-bottom:14px;}
+.gps-label{font-size:12px;color:var(--sepia);margin-bottom:8px;font-weight:500;}
+.gps-auto-btn{width:100%;padding:11px;background:var(--fog);color:var(--plum);border:1px solid var(--fog-mid);border-radius:var(--rs);font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;font-family:'Inter',sans-serif;}
+.gps-auto-btn:active{background:var(--fog-mid);}
+.gps-divider{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.gps-divider-line{flex:1;height:1px;background:var(--linen);}
+.gps-divider-text{font-size:11px;color:var(--sepia);}
+.gps-manual{display:flex;gap:8px;}
+.gps-hint{margin-top:5px;font-size:11px;color:var(--sepia);}
+.gps-result{padding:9px 12px;background:var(--fog);border-radius:var(--rs);font-size:12px;color:var(--plum);display:none;line-height:1.5;margin-top:8px;}
+
+.save-btn{width:100%;padding:14px;background:var(--plum);color:var(--fog);border:none;border-radius:var(--r);font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:500;cursor:pointer;margin-top:6px;letter-spacing:.3px;}
+.save-btn:disabled{background:var(--linen);color:var(--sepia);}
+
+/* ── MAP ── */
+.map-wrap{flex:1;position:relative;}
+#leafletMap{width:100%;height:100%;}
+.map-count{position:absolute;top:12px;left:12px;background:var(--white);border-radius:var(--rs);padding:6px 12px;font-size:12px;font-weight:500;border:1px solid var(--linen);z-index:1000;color:var(--oak);}
+.map-info{position:absolute;bottom:16px;left:16px;right:16px;background:var(--white);border-radius:var(--r);padding:13px 15px;border:1px solid var(--linen);z-index:1000;display:none;cursor:pointer;}
+.map-info.show{display:block;}
+.map-info-name{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;color:var(--oak);}
+.map-info-sub{font-size:12px;color:var(--sepia);margin-top:3px;}
+.map-info-tap{font-size:11px;color:var(--plum);margin-top:5px;font-weight:500;}
+
+/* ── DETAIL ── */
+.detail-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.detail-photos{display:flex;gap:8px;padding:12px 16px;overflow-x:auto;background:var(--white);border-bottom:1px solid var(--linen);}
+.detail-photos::-webkit-scrollbar{display:none;}
+.detail-photo-img{width:120px;height:100px;object-fit:cover;border-radius:var(--rs);flex-shrink:0;}
+.detail-photo-ph{width:100%;height:140px;background:var(--fog);display:flex;align-items:center;justify-content:center;font-size:44px;}
+.detail-body{padding:16px;}
+.detail-name{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:500;color:var(--oak);line-height:1.2;}
+.detail-life{font-size:14px;color:var(--sepia);margin-top:5px;}
+.section-title{font-size:10px;font-weight:600;color:var(--sepia);text-transform:uppercase;letter-spacing:.8px;margin:18px 0 8px;}
+.detail-card{background:var(--white);border:1px solid var(--linen);border-radius:var(--r);overflow:hidden;}
+.d-row{display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid var(--linen);gap:10px;}
+.d-row:last-child{border-bottom:none;}
+.d-icon{font-size:17px;width:24px;text-align:center;flex-shrink:0;}
+.d-label{font-size:12px;color:var(--sepia);flex:1;}
+.d-value{font-size:13px;font-weight:500;color:var(--oak);text-align:right;max-width:60%;word-break:break-word;}
+.action-btns{display:flex;gap:10px;margin-top:16px;}
+.btn-primary{flex:1;padding:13px;background:var(--plum);color:var(--fog);border:none;border-radius:var(--r);font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;letter-spacing:.2px;}
+.btn-secondary{flex:1;padding:13px;background:var(--white);color:var(--oak);border:1px solid var(--linen);border-radius:var(--r);font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
+.btn-danger{width:100%;padding:12px;background:white;color:var(--red);border:1px solid var(--red);border-radius:var(--r);font-size:14px;font-weight:500;cursor:pointer;margin-top:10px;font-family:'Inter',sans-serif;}
+
+/* ── SETTINGS ── */
+.settings-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;}
+.s-section{margin-bottom:20px;}
+.s-section-title{font-size:10px;font-weight:600;color:var(--sepia);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;}
+.s-card{background:var(--white);border:1px solid var(--linen);border-radius:var(--r);overflow:hidden;}
+.s-row{display:flex;align-items:center;padding:13px 14px;border-bottom:1px solid var(--linen);gap:12px;cursor:pointer;}
+.s-row:last-child{border-bottom:none;}
+.s-row:active{background:var(--parchment);}
+.s-icon{width:32px;height:32px;border-radius:var(--rs);background:var(--fog);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.s-label{flex:1;font-size:14px;color:var(--oak);}
+.s-value{font-size:12px;color:var(--sepia);}
+.toggle{width:44px;height:24px;border-radius:99px;background:var(--linen);position:relative;transition:background .2s;flex-shrink:0;}
+.toggle.on{background:var(--plum);}
+.toggle-dot{width:20px;height:20px;border-radius:50%;background:white;position:absolute;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.toggle.on .toggle-dot{left:22px;}
+
+/* ── TOAST & MODAL ── */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--plum-deep);color:var(--fog);padding:10px 20px;border-radius:var(--rs);font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9999;white-space:nowrap;font-family:'Inter',sans-serif;}
+.toast.show{opacity:1;}
+.modal-overlay{position:fixed;inset:0;background:rgba(42,31,61,.6);z-index:500;display:none;align-items:flex-end;}
+.modal-overlay.show{display:flex;}
+.modal{background:var(--white);border-radius:var(--r) var(--r) 0 0;width:100%;padding:20px 16px 32px;}
+.modal-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;color:var(--oak);margin-bottom:8px;}
+.modal-sub{font-size:13px;color:var(--sepia);margin-bottom:20px;line-height:1.6;}
+.modal-btns{display:flex;flex-direction:column;gap:10px;}
+.modal-btn{padding:14px;border-radius:var(--r);border:none;font-size:15px;cursor:pointer;}
+.modal-btn-primary{background:var(--plum);color:var(--fog);font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:500;}
+.modal-btn-secondary{background:var(--parchment);color:var(--oak);font-family:'Inter',sans-serif;font-size:14px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-back" id="headerBack" onclick="goBack()">‹</span>
+  <div class="header-text">
+    <div class="header-title" id="headerTitle">Memora</div>
+    <div class="header-sub" id="headerSub">Записи захоронений</div>
+  </div>
+  <div class="header-count" id="headerCount">0 записей</div>
+</div>
+
+<div class="tabs" id="mainTabs">
+  <div class="tab active" data-screen="search" onclick="switchTab('search')"><span class="tab-icon">🔍</span>Поиск</div>
+  <div class="tab" data-screen="add" onclick="switchTab('add')"><span class="tab-icon">➕</span>Добавить</div>
+  <div class="tab" data-screen="map" onclick="switchTab('map')"><span class="tab-icon">🗺</span>Карта</div>
+  <div class="tab" data-screen="settings" onclick="switchTab('settings')"><span class="tab-icon">⚙️</span>Настройки</div>
+</div>
+
+<div class="main">
+
+  <!-- ПОИСК -->
+  <div class="screen active" id="screen-search">
+    <div class="search-top">
+      <div class="search-bar">
+        <input class="search-input" id="searchInput" type="text" placeholder="Поиск по фамилии, имени..." oninput="doSearch()"/>
+      </div>
+      <div class="sort-bar">
+        <div class="sort-chip active" data-sort="alpha" onclick="setSort('alpha')">А — Я</div>
+        <div class="sort-chip" data-sort="oldest" onclick="setSort('oldest')">Давние → новые</div>
+        <div class="sort-chip" data-sort="newest" onclick="setSort('newest')">Новые → давние</div>
+        <div class="sort-chip" data-sort="mine" onclick="setSort('mine')">Мои записи</div>
+      </div>
+    </div>
+    <div class="search-results" id="searchResults">
+      <div class="loading"><div class="spinner"></div>Загрузка...</div>
+    </div>
+  </div>
+
+  <!-- ДОБАВИТЬ -->
+  <div class="screen" id="screen-add">
+    <div class="add-scroll">
+      <div id="addBanner" class="banner banner-free">✦ Бесплатных слотов: <strong id="freeLeft">2</strong> из 2</div>
+
+      <div class="field-group">
+        <div class="field-label">Фамилия *</div>
+        <input class="field-input" id="f_last" type="text" placeholder="Иванов"/>
+      </div>
+      <div class="field-row">
+        <div class="field-group">
+          <div class="field-label">Имя *</div>
+          <input class="field-input" id="f_first" type="text" placeholder="Пётр"/>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Отчество</div>
+          <input class="field-input" id="f_mid" type="text" placeholder="Николаевич"/>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field-group">
+          <div class="field-label">Год рождения</div>
+          <input class="field-input" id="f_birth" type="number" placeholder="1945"/>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Год смерти *</div>
+          <input class="field-input" id="f_death" type="number" placeholder="2018"/>
+        </div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">Точная дата смерти (для напоминаний)</div>
+        <input class="field-input" id="f_deathDate" type="date"/>
+      </div>
+      <div class="field-row">
+        <div class="field-group">
+          <div class="field-label">Сектор</div>
+          <input class="field-input" id="f_sector" type="text" placeholder="А-7"/>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Ряд</div>
+          <input class="field-input" id="f_row" type="text" placeholder="12"/>
+        </div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">Ориентир</div>
+        <input class="field-input" id="f_land" type="text" placeholder="Рядом с берёзой, у центральной аллеи..."/>
+      </div>
+
+      <!-- ФОТО -->
+      <div class="photos-section">
+        <div class="field-label">Фото захоронения</div>
+        <div id="photoBanner" class="photo-banner free">📷 1 фото бесплатно · пакет до 5 фото = 1$ (Telegram Stars)</div>
+        <div class="photos-scroll" id="photosScroll">
+          <div class="photo-add-btn" onclick="addPhoto()"><span>📷</span><small>Добавить</small></div>
+        </div>
+        <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhoto(this)"/>
+      </div>
+
+      <!-- GPS -->
+      <div class="gps-section">
+        <div class="gps-label">📍 Координаты GPS</div>
+        <button class="gps-auto-btn" onclick="getGPS()">📍 Определить автоматически (стоя у могилы)</button>
+        <div class="gps-divider">
+          <div class="gps-divider-line"></div>
+          <div class="gps-divider-text">или введите вручную</div>
+          <div class="gps-divider-line"></div>
+        </div>
+        <div class="gps-manual">
+          <input class="field-input" id="f_lat" type="number" step="0.000001" placeholder="Широта (53.2068)"/>
+          <input class="field-input" id="f_lng" type="number" step="0.000001" placeholder="Долгота (63.6272)"/>
+        </div>
+        <div class="gps-hint">Координаты можно скопировать из Google Maps или 2GIS</div>
+        <div class="gps-result" id="gpsResult">✓ Координаты определены: <strong id="gpsCoords"></strong></div>
+      </div>
+
+      <button class="save-btn" id="saveBtn" onclick="saveGrave()">Сохранить запись</button>
+    </div>
+  </div>
+
+  <!-- КАРТА -->
+  <div class="screen" id="screen-map">
+    <div class="map-wrap">
+      <div class="map-count" id="mapCount">0 точек</div>
+      <div id="leafletMap"></div>
+      <div class="map-info" id="mapInfo" onclick="openMapDetail()">
+        <div class="map-info-name" id="mapInfoName"></div>
+        <div class="map-info-sub" id="mapInfoSub"></div>
+        <div class="map-info-tap">Нажмите для подробностей →</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- КАРТОЧКА -->
+  <div class="screen" id="screen-detail">
+    <div class="detail-scroll">
+      <div id="detailPhotosWrap"></div>
+      <div class="detail-body">
+        <div class="detail-name" id="detailName"></div>
+        <div class="detail-life" id="detailLife"></div>
+        <div class="section-title">Расположение</div>
+        <div class="detail-card">
+          <div class="d-row"><div class="d-icon">🗺</div><div class="d-label">Сектор / ряд</div><div class="d-value" id="dSector">—</div></div>
+          <div class="d-row"><div class="d-icon">📍</div><div class="d-label">Координаты</div><div class="d-value" id="dCoords">—</div></div>
+          <div class="d-row"><div class="d-icon">🌿</div><div class="d-label">Ориентир</div><div class="d-value" id="dLand">—</div></div>
+        </div>
+        <div class="action-btns">
+          <button class="btn-primary" onclick="openMaps()">🧭 Маршрут</button>
+          <button class="btn-secondary" onclick="shareGrave()">📤 Поделиться</button>
+        </div>
+        <div class="section-title">Напоминания</div>
+        <div class="detail-card" id="dReminders"></div>
+        <button class="btn-danger" id="deleteBtn" onclick="confirmDelete()" style="display:none">Удалить запись</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- НАСТРОЙКИ -->
+  <div class="screen" id="screen-settings">
+    <div class="settings-scroll">
+      <div class="s-section">
+        <div class="s-section-title">Аккаунт</div>
+        <div class="s-card">
+          <div class="s-row"><div class="s-icon">👤</div><div class="s-label">Telegram ID</div><div class="s-value" id="sUserId">—</div></div>
+          <div class="s-row" onclick="setSort('mine');switchTab('search')"><div class="s-icon">📋</div><div class="s-label">Мои записи</div><div class="s-value" style="color:var(--plum)">Открыть →</div></div>
+          <div class="s-row"><div class="s-icon">✦</div><div class="s-label">Бесплатных слотов</div><div class="s-value" id="sFreeSlots">2</div></div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-section-title">Напоминания</div>
+        <div class="s-card">
+          <div class="s-row" onclick="toggleRemind('day9')"><div class="s-icon">9️⃣</div><div class="s-label">9 дней</div><div class="toggle on" id="tog-day9"><div class="toggle-dot"></div></div></div>
+          <div class="s-row" onclick="toggleRemind('day40')"><div class="s-icon">4️⃣</div><div class="s-label">40 дней</div><div class="toggle on" id="tog-day40"><div class="toggle-dot"></div></div></div>
+          <div class="s-row" onclick="toggleRemind('annual')"><div class="s-icon">📅</div><div class="s-label">Годовщина (каждый год)</div><div class="toggle on" id="tog-annual"><div class="toggle-dot"></div></div></div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-section-title">Навигация</div>
+        <div class="s-card">
+          <div class="s-row" onclick="setMaps('google')"><div class="s-icon">🗺</div><div class="s-label">Google Maps</div><div class="s-value" id="mv-google">✓</div></div>
+          <div class="s-row" onclick="setMaps('yandex')"><div class="s-icon">🧭</div><div class="s-label">Яндекс Карты</div><div class="s-value" id="mv-yandex"></div></div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-section-title">О приложении</div>
+        <div class="s-card">
+          <div class="s-row"><div class="s-icon">✦</div><div class="s-label">Memora</div><div class="s-value">v1.0.0</div></div>
+          <div class="s-row"><div class="s-icon">🌐</div><div class="s-label">Всего записей</div><div class="s-value" id="sTotal">0</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-sub" id="modalSub"></div>
+    <div class="modal-btns" id="modalBtns"></div>
+  </div>
+</div>
+
+<!-- ═══ FIREBASE — ЗАМЕНИТЕ СВОИМИ ДАННЫМИ ═══ -->
+<script>
+const firebaseConfig = {
+  apiKey:            "AIzaSyA3jcWpqHKg7hySRkEYx-_SlXtx-ANjRro",
+  authDomain:        "memora-50fdb.firebaseapp.com",
+  projectId:         "memora-50fdb",
+  storageBucket:     "memora-50fdb.firebasestorage.app",
+  messagingSenderId: "272095012321",
+  appId:             "1:272095012321:web:3d55fcc5fb39ae445fdea0"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+</script>
+
+<script>
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+const TG_USER = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+const USER_ID   = TG_USER ? String(TG_USER.id) : 'demo_' + Math.random().toString(36).substr(2,8);
+const USER_NAME = TG_USER ? (TG_USER.first_name || 'Гость') : 'Гость';
+
+const FREE_CARD_LIMIT  = 2;
+const FREE_PHOTO_LIMIT = 1;
+const MAX_PHOTOS       = 5;
+
+let allGraves        = [];
+let currentGrave     = null;
+let userCardCount    = 0;
+let pendingPhotos    = [];
+let photoPaidUnlocked = false;
+let mapsApp          = localStorage.getItem('mapsApp') || 'google';
+let remindSettings   = JSON.parse(localStorage.getItem('remindSettings') || '{"day9":true,"day40":true,"annual":true}');
+let leafletMap       = null;
+let selectedMapGrave = null;
+let currentSort      = 'alpha';
+let prevTab          = 'search';
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('sUserId').textContent = USER_ID.substr(0,14);
+  applyMapsUI(); applyRemindUI();
+  await loadGraves();
+});
+
+// ── LOAD ──────────────────────────────────────────────────────
+async function loadGraves() {
+  try {
+    const snap = await db.collection('graves').orderBy('createdAt','desc').get();
+    allGraves = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    userCardCount = allGraves.filter(g => g.userId === USER_ID).length;
+    renderList(applySort(allGraves));
+    const total = allGraves.length;
+    document.getElementById('headerCount').textContent  = total + ' записей';
+    document.getElementById('sFreeSlots').textContent   = Math.max(0, FREE_CARD_LIMIT - userCardCount);
+    document.getElementById('sTotal').textContent       = total;
+    updateAddBanner();
+    if (leafletMap) renderMapMarkers();
+  } catch(e) {
+    document.getElementById('searchResults').innerHTML =
+      '<div class="empty-state"><div class="empty-icon">✦</div><div class="empty-title">Ошибка подключения</div><div class="empty-sub">Проверьте Firebase конфигурацию</div></div>';
+  }
+}
+
+// ── LIST ──────────────────────────────────────────────────────
+function renderList(list) {
+  const el = document.getElementById('searchResults');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🌿</div><div class="empty-title">Ничего не найдено</div><div class="empty-sub">Попробуйте изменить фильтр<br>или добавьте первую запись</div></div>';
+    return;
+  }
+  el.innerHTML = list.map(g => {
+    const ini = ((g.lastName||'?')[0]+(g.firstName||'?')[0]).toUpperCase();
+    const sec = g.sector ? g.sector+(g.row?', ряд '+g.row:'') : 'Сектор не указан';
+    return `<div class="grave-item" onclick="showDetail('${g.id}')">
+      <div class="grave-avatar">${ini}</div>
+      <div class="grave-info">
+        <div class="grave-name">${g.lastName} ${g.firstName} ${g.patronymic||''}</div>
+        <div class="grave-dates">${g.birthYear||'?'} — ${g.deathYear||'?'}</div>
+        <div class="grave-sector">📍 ${sec}</div>
+      </div>
+      <div class="grave-arrow">›</div>
+    </div>`;
+  }).join('');
+}
+
+// ── SEARCH & SORT ──────────────────────────────────────────────
+function applySort(list) {
+  let res = [...list];
+  if (currentSort === 'mine')   res = res.filter(g => g.userId === USER_ID);
+  if (currentSort === 'oldest') res.sort((a,b) => (Number(a.deathYear)||9999) - (Number(b.deathYear)||9999));
+  else if (currentSort === 'newest') res.sort((a,b) => (Number(b.deathYear)||0) - (Number(a.deathYear)||0));
+  else res.sort((a,b) => (a.lastName||'').localeCompare(b.lastName||'','ru'));
+  return res;
+}
+function setSort(sort) {
+  currentSort = sort;
+  document.querySelectorAll('.sort-chip').forEach(c => c.classList.toggle('active', c.dataset.sort === sort));
+  doSearch();
+}
+function doSearch() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  let res = [...allGraves];
+  if (q) res = res.filter(g => (g.lastName+' '+g.firstName+' '+(g.patronymic||'')).toLowerCase().includes(q));
+  renderList(applySort(res));
+}
+
+// ── PHOTOS ────────────────────────────────────────────────────
+function addPhoto() {
+  const canAdd = photoPaidUnlocked ? pendingPhotos.length < MAX_PHOTOS : pendingPhotos.length < FREE_PHOTO_LIMIT;
+  if (!canAdd) { showPhotoPayModal(); return; }
+  document.getElementById('photoInput').click();
+}
+function handlePhoto(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { pendingPhotos.push({file, url:e.target.result}); renderPhotoScroll(); };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+function renderPhotoScroll() {
+  const canAddMore = photoPaidUnlocked ? pendingPhotos.length < MAX_PHOTOS : pendingPhotos.length < FREE_PHOTO_LIMIT;
+  let html = pendingPhotos.map((p,i) =>
+    `<div style="position:relative;flex-shrink:0">
+       <img src="${p.url}" class="photo-thumb"/>
+       <div onclick="removePhoto(${i})" style="position:absolute;top:-4px;right:-4px;width:20px;height:20px;background:var(--red);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;font-weight:700">✕</div>
+     </div>`
+  ).join('');
+  if (canAddMore) html += `<div class="photo-add-btn" onclick="addPhoto()"><span>📷</span><small>Добавить</small></div>`;
+  else if (!photoPaidUnlocked) html += `<div class="photo-locked" onclick="showPhotoPayModal()"><span>⭐</span><small>ещё фото<br>за 1$</small></div>`;
+  document.getElementById('photosScroll').innerHTML = html;
+  const banner = document.getElementById('photoBanner');
+  if (photoPaidUnlocked) {
+    banner.className = 'photo-banner free';
+    banner.textContent = `📷 Пакет активирован · ${pendingPhotos.length} из ${MAX_PHOTOS} фото`;
+  } else if (pendingPhotos.length >= FREE_PHOTO_LIMIT) {
+    banner.className = 'photo-banner paid';
+    banner.textContent = `⭐ 1 фото добавлено. Хотите больше? Пакет до 5 фото = 1$`;
+  } else {
+    banner.className = 'photo-banner free';
+    banner.textContent = `📷 1 фото бесплатно · пакет до 5 фото = 1$ (Telegram Stars)`;
+  }
+}
+function removePhoto(idx) { pendingPhotos.splice(idx,1); renderPhotoScroll(); }
+function showPhotoPayModal() {
+  showModal('⭐ Пакет фотографий',
+    'Добавьте до 5 фотографий к записи. Стоимость — 1$ в Telegram Stars.',
+    [{label:'⭐ Оплатить 1$', primary:true, action:()=>{
+        if(tg&&tg.sendData) tg.sendData(JSON.stringify({action:'pay_photo_pack',userId:USER_ID}));
+        else { photoPaidUnlocked=true; renderPhotoScroll(); showToast('Пакет фото активирован'); }
+        closeModal();
+    }},{label:'Отмена', primary:false, action:closeModal}]
+  );
+}
+
+// ── GPS ───────────────────────────────────────────────────────
+function getGPS() {
+  if (!navigator.geolocation) { showToast('GPS недоступен'); return; }
+  showToast('Определяю координаты...');
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude.toFixed(6);
+    const lng = pos.coords.longitude.toFixed(6);
+    document.getElementById('f_lat').value = lat;
+    document.getElementById('f_lng').value = lng;
+    document.getElementById('gpsCoords').textContent = `${lat}, ${lng}`;
+    document.getElementById('gpsResult').style.display = 'block';
+    showToast('Координаты определены ✓');
+  }, () => showToast('Не удалось получить GPS. Введите вручную.'));
+}
+
+// ── ADD BANNER ────────────────────────────────────────────────
+function updateAddBanner() {
+  const left = Math.max(0, FREE_CARD_LIMIT - userCardCount);
+  const el = document.getElementById('addBanner');
+  document.getElementById('freeLeft').textContent = left;
+  if (left > 0) {
+    el.className = 'banner banner-free';
+    el.innerHTML = `✦ Бесплатных слотов: <strong>${left}</strong> из ${FREE_CARD_LIMIT}`;
+  } else {
+    el.className = 'banner banner-paid';
+    el.innerHTML = `⭐ Бесплатные слоты исчерпаны. Следующая карточка — <strong>1$ (Telegram Stars)</strong>`;
+  }
+}
+
+// ── SAVE ──────────────────────────────────────────────────────
+async function saveGrave() {
+  const last  = document.getElementById('f_last').value.trim();
+  const first = document.getElementById('f_first').value.trim();
+  const death = document.getElementById('f_death').value.trim();
+  if (!last||!first) { showToast('Введите фамилию и имя'); return; }
+  if (!death)        { showToast('Введите год смерти'); return; }
+  if (Math.max(0, FREE_CARD_LIMIT - userCardCount) === 0) { showCardPayModal(); return; }
+  const lat = parseFloat(document.getElementById('f_lat').value)||null;
+  const lng = parseFloat(document.getElementById('f_lng').value)||null;
+  const btn = document.getElementById('saveBtn');
+  btn.disabled=true; btn.textContent='Сохраняю...';
+  try {
+    const photoUrls = [];
+    for (const p of pendingPhotos) {
+      photoUrls.push(p.url); // base64 — храним прямо в Firestore
+    }
+    await db.collection('graves').add({
+      lastName:   last,
+      firstName:  first,
+      patronymic: document.getElementById('f_mid').value.trim(),
+      birthYear:  document.getElementById('f_birth').value||null,
+      deathYear:  death,
+      deathDate:  document.getElementById('f_deathDate').value||null,
+      sector:     document.getElementById('f_sector').value.trim(),
+      row:        document.getElementById('f_row').value.trim(),
+      landmark:   document.getElementById('f_land').value.trim(),
+      lat, lng,
+      photos:     photoUrls,
+      photoPack:  photoPaidUnlocked,
+      userId:     USER_ID,
+      userName:   USER_NAME,
+      createdAt:  firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('Запись сохранена ✓');
+    resetForm();
+    await loadGraves();
+    switchTab('search');
+  } catch(e) {
+    showToast('Ошибка сохранения. Попробуйте снова.');
+  } finally {
+    btn.disabled=false; btn.textContent='Сохранить запись';
+  }
+}
+function resetForm() {
+  ['f_last','f_first','f_mid','f_birth','f_death','f_deathDate','f_sector','f_row','f_land','f_lat','f_lng']
+    .forEach(id => document.getElementById(id).value='');
+  document.getElementById('gpsResult').style.display='none';
+  pendingPhotos=[]; photoPaidUnlocked=false;
+  document.getElementById('photosScroll').innerHTML =
+    '<div class="photo-add-btn" onclick="addPhoto()"><span>📷</span><small>Добавить</small></div>';
+  document.getElementById('photoBanner').className='photo-banner free';
+  document.getElementById('photoBanner').textContent='📷 1 фото бесплатно · пакет до 5 фото = 1$ (Telegram Stars)';
+}
+function showCardPayModal() {
+  showModal('⭐ Добавление записи',
+    'Бесплатные слоты исчерпаны. Стоимость следующей карточки — 1$ в Telegram Stars.',
+    [{label:'⭐ Оплатить 1$', primary:true, action:()=>{
+        if(tg&&tg.sendData) tg.sendData(JSON.stringify({action:'pay_card',userId:USER_ID}));
+        else showToast('Оплата доступна только в Telegram');
+        closeModal();
+    }},{label:'Отмена', primary:false, action:closeModal}]
+  );
+}
+
+// ── DETAIL ────────────────────────────────────────────────────
+function showDetail(id) {
+  currentGrave = allGraves.find(g => g.id === id);
+  if (!currentGrave) return;
+  fillDetail(currentGrave);
+  document.getElementById('headerBack').style.display='block';
+  document.getElementById('headerCount').style.display='none';
+  document.getElementById('mainTabs').style.display='none';
+  document.getElementById('headerTitle').textContent = currentGrave.lastName+' '+currentGrave.firstName;
+  document.getElementById('headerSub').textContent = currentGrave.birthYear||'?' +' — '+currentGrave.deathYear||'?';
+  showScreen('detail');
+}
+function fillDetail(g) {
+  document.getElementById('detailName').textContent = `${g.lastName} ${g.firstName} ${g.patronymic||''}`;
+  document.getElementById('detailLife').textContent = `${g.birthYear||'?'} — ${g.deathYear||'?'}`;
+  const wrap = document.getElementById('detailPhotosWrap');
+  if (g.photos && g.photos.length) {
+    wrap.innerHTML = `<div class="detail-photos">${g.photos.map(u=>`<img src="${u}" class="detail-photo-img"/>`).join('')}</div>`;
+  } else {
+    wrap.innerHTML = '<div class="detail-photo-ph">🌿</div>';
+  }
+  document.getElementById('dSector').textContent = g.sector ? g.sector+(g.row?', ряд '+g.row:'') : '—';
+  document.getElementById('dCoords').textContent  = g.lat&&g.lng ? `${Number(g.lat).toFixed(5)}, ${Number(g.lng).toFixed(5)}` : '—';
+  document.getElementById('dLand').textContent    = g.landmark||'—';
+  document.getElementById('deleteBtn').style.display = g.userId===USER_ID ? 'block' : 'none';
+  const remDiv = document.getElementById('dReminders');
+  remDiv.innerHTML = g.deathDate
+    ? calcReminders(g.deathDate).map(r=>`<div class="d-row"><div class="d-icon">${r.icon}</div><div class="d-label">${r.label}</div><div class="d-value">${r.date}</div></div>`).join('')
+    : '<div class="d-row"><div class="d-label" style="font-size:12px;color:var(--sepia)">Дата смерти не указана</div></div>';
+}
+function calcReminders(ds) {
+  const d = new Date(ds);
+  const fmt = x => x.toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+  const add = (x,n) => { const r=new Date(x); r.setDate(r.getDate()+n); return r; };
+  const ty  = x => { const r=new Date(x); r.setFullYear(new Date().getFullYear()); return r; };
+  return [
+    {icon:'9️⃣', label:'9 дней',               date:fmt(add(d,9))},
+    {icon:'4️⃣', label:'40 дней',              date:fmt(add(d,40))},
+    {icon:'📅', label:'Годовщина (каждый год)', date:fmt(ty(d))}
+  ];
+}
+
+// ── MAPS ──────────────────────────────────────────────────────
+function openMaps() {
+  if (!currentGrave||!currentGrave.lat||!currentGrave.lng) { showToast('Координаты не указаны'); return; }
+  const {lat,lng} = currentGrave;
+  const url = mapsApp==='yandex'
+    ? `https://maps.yandex.ru/?ll=${lng},${lat}&z=18&pt=${lng},${lat}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  if (tg) tg.openLink(url); else window.open(url,'_blank');
+}
+function shareGrave() {
+  if (!currentGrave) return;
+  const g = currentGrave;
+  const text = `✦ ${g.lastName} ${g.firstName} ${g.patronymic||''}\n`
+    +`${g.birthYear||'?'} — ${g.deathYear||'?'}\n`
+    +(g.sector?`Сектор: ${g.sector}${g.row?', ряд '+g.row:''}\n`:'')
+    +(g.landmark?`Ориентир: ${g.landmark}\n`:'')
+    +(g.lat&&g.lng?`GPS: https://maps.google.com/?q=${g.lat},${g.lng}`:'');
+  if (navigator.share) navigator.share({text});
+  else navigator.clipboard.writeText(text).then(()=>showToast('Скопировано ✓'));
+}
+
+// ── LEAFLET ───────────────────────────────────────────────────
+function initMap() {
+  if (leafletMap) { renderMapMarkers(); return; }
+  leafletMap = L.map('leafletMap',{zoomControl:true}).setView([53.2068,63.6272],15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(leafletMap);
+  leafletMap.on('click',()=>document.getElementById('mapInfo').classList.remove('show'));
+  renderMapMarkers();
+}
+function renderMapMarkers() {
+  leafletMap.eachLayer(l=>{ if(l instanceof L.Marker) leafletMap.removeLayer(l); });
+  const pts = allGraves.filter(g=>g.lat&&g.lng);
+  document.getElementById('mapCount').textContent = pts.length+' точек';
+  const icon = L.divIcon({
+    html:'<div style="width:13px;height:13px;background:#5B4B7A;border:2px solid #F0ECF8;border-radius:50%;box-shadow:0 1px 4px rgba(42,31,61,.5)"></div>',
+    className:'',iconSize:[13,13],iconAnchor:[6,6]
+  });
+  pts.forEach(g=>{
+    L.marker([g.lat,g.lng],{icon}).addTo(leafletMap).on('click',()=>{
+      selectedMapGrave=g;
+      document.getElementById('mapInfoName').textContent=`${g.lastName} ${g.firstName} ${g.patronymic||''}`;
+      document.getElementById('mapInfoSub').textContent=`${g.birthYear||'?'} — ${g.deathYear||'?'} · ${g.sector?g.sector+(g.row?', ряд '+g.row:''):'сектор не указан'}`;
+      document.getElementById('mapInfo').classList.add('show');
+    });
+  });
+}
+function openMapDetail() {
+  if (!selectedMapGrave) return;
+  currentGrave=selectedMapGrave;
+  fillDetail(currentGrave);
+  document.getElementById('headerBack').style.display='block';
+  document.getElementById('headerCount').style.display='none';
+  document.getElementById('mainTabs').style.display='none';
+  document.getElementById('headerTitle').textContent=currentGrave.lastName+' '+currentGrave.firstName;
+  document.getElementById('headerSub').textContent='';
+  showScreen('detail');
+}
+
+// ── DELETE ────────────────────────────────────────────────────
+function confirmDelete() {
+  showModal('Удалить запись?',
+    `«${currentGrave.lastName} ${currentGrave.firstName}» будет удалена навсегда.`,
+    [{label:'Удалить', primary:true, action:async()=>{
+        closeModal();
+        await db.collection('graves').doc(currentGrave.id).delete();
+        showToast('Запись удалена');
+        await loadGraves();
+        goBack();
+    }},{label:'Отмена', primary:false, action:closeModal}]
+  );
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────
+function toggleRemind(k) {
+  remindSettings[k]=!remindSettings[k];
+  localStorage.setItem('remindSettings',JSON.stringify(remindSettings));
+  applyRemindUI();
+}
+function applyRemindUI() {
+  ['day9','day40','annual'].forEach(k=>{
+    const el=document.getElementById('tog-'+k);
+    if(el) el.className='toggle '+(remindSettings[k]?'on':'');
+  });
+}
+function setMaps(app) {
+  mapsApp=app; localStorage.setItem('mapsApp',app); applyMapsUI();
+  showToast(app==='google'?'Google Maps выбран':'Яндекс Карты выбраны');
+}
+function applyMapsUI() {
+  document.getElementById('mv-google').textContent=mapsApp==='google'?'✓':'';
+  document.getElementById('mv-yandex').textContent=mapsApp==='yandex'?'✓':'';
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────
+function switchTab(name) {
+  prevTab=name;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.screen===name));
+  document.getElementById('headerBack').style.display='none';
+  document.getElementById('headerCount').style.display='block';
+  document.getElementById('mainTabs').style.display='flex';
+  document.getElementById('headerTitle').textContent='Memora';
+  document.getElementById('headerSub').textContent='Записи захоронений';
+  showScreen(name);
+  if(name==='map') setTimeout(initMap,50);
+}
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+}
+function goBack() {
+  switchTab(prevTab==='detail'?'search':prevTab);
+}
+
+// ── MODAL ─────────────────────────────────────────────────────
+function showModal(title,sub,btns) {
+  document.getElementById('modalTitle').textContent=title;
+  document.getElementById('modalSub').textContent=sub;
+  const el=document.getElementById('modalBtns'); el.innerHTML='';
+  btns.forEach(b=>{
+    const btn=document.createElement('button');
+    btn.className='modal-btn '+(b.primary?'modal-btn-primary':'modal-btn-secondary');
+    btn.textContent=b.label; btn.onclick=b.action; el.appendChild(btn);
+  });
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('show');}
+document.getElementById('modalOverlay').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
+
+// ── TOAST ─────────────────────────────────────────────────────
+let tt;
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2500);
+}
+</script>
+</body>
+</html>
