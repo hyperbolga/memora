@@ -336,7 +336,10 @@ body{display:flex;flex-direction:column;font-family:'Inter',sans-serif;}
         </div>
         <div class="section-title">Напоминания</div>
         <div class="detail-card" id="dReminders"></div>
-        <button class="btn-danger" id="deleteBtn" onclick="confirmDelete()" style="display:none">Удалить запись</button>
+        <div id="ownerBtns" style="display:none">
+          <button class="btn-secondary" style="width:100%;margin-top:10px" onclick="editGrave()">✏️ Редактировать запись</button>
+          <button class="btn-danger" onclick="confirmDelete()">Удалить запись</button>
+        </div>
       </div>
     </div>
   </div>
@@ -659,7 +662,7 @@ function fillDetail(g) {
   document.getElementById('dSector').textContent = g.sector ? g.sector+(g.row?', ряд '+g.row:'') : '—';
   document.getElementById('dCoords').textContent  = g.lat&&g.lng ? `${Number(g.lat).toFixed(5)}, ${Number(g.lng).toFixed(5)}` : '—';
   document.getElementById('dLand').textContent    = g.landmark||'—';
-  document.getElementById('deleteBtn').style.display = g.userId===USER_ID ? 'block' : 'none';
+  document.getElementById('ownerBtns').style.display = g.userId===USER_ID ? 'block' : 'none';
   const remDiv = document.getElementById('dReminders');
   remDiv.innerHTML = g.deathDate
     ? calcReminders(g.deathDate).map(r=>`<div class="d-row"><div class="d-icon">${r.icon}</div><div class="d-label">${r.label}</div><div class="d-value">${r.date}</div></div>`).join('')
@@ -735,7 +738,78 @@ function openMapDetail() {
   showScreen('detail');
 }
 
-// ── DELETE ────────────────────────────────────────────────────
+// ── EDIT ──────────────────────────────────────────────────────
+function editGrave() {
+  if (!currentGrave) return;
+  const g = currentGrave;
+  // Заполняем форму данными текущей записи
+  document.getElementById('f_last').value       = g.lastName||'';
+  document.getElementById('f_first').value      = g.firstName||'';
+  document.getElementById('f_mid').value        = g.patronymic||'';
+  document.getElementById('f_birth').value      = g.birthYear||'';
+  document.getElementById('f_death').value      = g.deathYear||'';
+  document.getElementById('f_deathDate').value  = g.deathDate||'';
+  document.getElementById('f_sector').value     = g.sector||'';
+  document.getElementById('f_row').value        = g.row||'';
+  document.getElementById('f_land').value       = g.landmark||'';
+  document.getElementById('f_lat').value        = g.lat||'';
+  document.getElementById('f_lng').value        = g.lng||'';
+  // Показываем фото если есть
+  if (g.photos && g.photos.length) {
+    pendingPhotos = g.photos.map(url => ({ url, file: null }));
+    renderPhotoScroll();
+  }
+  // Меняем кнопку сохранения на "Обновить"
+  const btn = document.getElementById('saveBtn');
+  btn.textContent = 'Обновить запись';
+  btn.onclick = () => updateGrave(g.id);
+  // Показываем форму
+  switchTab('add');
+  document.getElementById('addBanner').style.display = 'none';
+  showToast('Редактируете запись');
+}
+
+async function updateGrave(id) {
+  const last  = document.getElementById('f_last').value.trim();
+  const first = document.getElementById('f_first').value.trim();
+  const death = document.getElementById('f_death').value.trim();
+  if (!last||!first) { showToast('Введите фамилию и имя'); return; }
+  if (!death)        { showToast('Введите год смерти'); return; }
+  const lat = parseFloat(document.getElementById('f_lat').value)||null;
+  const lng = parseFloat(document.getElementById('f_lng').value)||null;
+  const btn = document.getElementById('saveBtn');
+  btn.disabled=true; btn.textContent='Сохраняю...';
+  try {
+    const photoUrls = pendingPhotos.map(p => p.url);
+    await db.collection('graves').doc(id).update({
+      lastName:   last,
+      firstName:  first,
+      patronymic: document.getElementById('f_mid').value.trim(),
+      birthYear:  document.getElementById('f_birth').value||null,
+      deathYear:  death,
+      deathDate:  document.getElementById('f_deathDate').value||null,
+      sector:     document.getElementById('f_sector').value.trim(),
+      row:        document.getElementById('f_row').value.trim(),
+      landmark:   document.getElementById('f_land').value.trim(),
+      lat, lng,
+      photos:     photoUrls,
+    });
+    showToast('Запись обновлена ✓');
+    resetForm();
+    // Восстанавливаем кнопку
+    btn.textContent = 'Сохранить запись';
+    btn.onclick = saveGrave;
+    document.getElementById('addBanner').style.display = 'block';
+    await loadGraves();
+    switchTab('search');
+  } catch(e) {
+    showToast('Ошибка обновления');
+  } finally {
+    btn.disabled=false;
+  }
+}
+
+
 function confirmDelete() {
   showModal('Удалить запись?',
     `«${currentGrave.lastName} ${currentGrave.firstName}» будет удалена навсегда.`,
