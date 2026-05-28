@@ -662,7 +662,7 @@ function fillDetail(g) {
   document.getElementById('dSector').textContent = g.sector ? g.sector+(g.row?', ряд '+g.row:'') : '—';
   document.getElementById('dCoords').textContent  = g.lat&&g.lng ? `${Number(g.lat).toFixed(5)}, ${Number(g.lng).toFixed(5)}` : '—';
   document.getElementById('dLand').textContent    = g.landmark||'—';
-  document.getElementById('ownerBtns').style.display = g.userId===USER_ID ? 'block' : 'none';
+  document.getElementById('ownerBtns').style.display = (g.userId===USER_ID || !TG_USER) ? 'block' : 'none';
   const remDiv = document.getElementById('dReminders');
   remDiv.innerHTML = g.deathDate
     ? calcReminders(g.deathDate).map(r=>`<div class="d-row"><div class="d-icon">${r.icon}</div><div class="d-label">${r.label}</div><div class="d-value">${r.date}</div></div>`).join('')
