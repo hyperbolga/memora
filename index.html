@@ -58,7 +58,8 @@ body{display:flex;flex-direction:column;font-family:'Inter',sans-serif;}
 .grave-dates{font-size:12px;color:var(--sepia);margin-top:2px;}
 .grave-sector{font-size:11px;color:var(--sepia);margin-top:2px;}
 .grave-arrow{color:var(--iris);font-size:20px;align-self:center;}
-.private-badge{font-size:10px;background:var(--fog);color:var(--plum);padding:2px 8px;border-radius:99px;display:inline-block;margin-top:3px;}
+.private-badge{font-size:10px;background:var(--fog);color:var(--plum);padding:2px 6px;border-radius:99px;display:inline-flex;align-items:center;}
+.tag-chip{font-size:11px;background:var(--plum-deep);color:var(--fog);padding:2px 8px;border-radius:99px;display:inline-flex;align-items:center;}
 
 .empty-state{padding:60px 20px;text-align:center;color:var(--sepia);}
 .empty-icon{font-size:44px;margin-bottom:12px;}
@@ -200,7 +201,7 @@ body{display:flex;flex-direction:column;font-family:'Inter',sans-serif;}
 <div class="tabs" id="mainTabs">
   <div class="tab active" data-screen="mine" onclick="switchTab('mine')"><span class="tab-icon">🕯</span>Мои</div>
   <div class="tab" data-screen="search" onclick="switchTab('search')"><span class="tab-icon">🔍</span>Поиск</div>
-  <div class="tab" data-screen="add" onclick="switchTab('add')"><span class="tab-icon">➕</span>Добавить</div>
+  <div class="tab" data-screen="add" onclick="switchTab('add')"><span class="tab-icon" style="font-size:22px;line-height:1;text-shadow:0 0 0 white,-1px -1px 0 rgba(255,255,255,0.5),1px -1px 0 rgba(255,255,255,0.5),-1px 1px 0 rgba(255,255,255,0.5),1px 1px 0 rgba(255,255,255,0.5)">➕</span>Добавить</div>
   <div class="tab" data-screen="map" onclick="switchTab('map')"><span class="tab-icon">🗺</span>Карта</div>
   <div class="tab" data-screen="settings" onclick="switchTab('settings')"><span class="tab-icon">⚙️</span>Настройки</div>
 </div>
@@ -364,6 +365,10 @@ body{display:flex;flex-direction:column;font-family:'Inter',sans-serif;}
           <button class="btn-primary" onclick="openMaps()">🧭 Маршрут</button>
           <button class="btn-secondary" onclick="shareGrave()">📤 Поделиться</button>
         </div>
+        <div class="action-btns" style="margin-top:8px">
+          <button class="btn-secondary" onclick="showTagModal(currentGrave&&currentGrave.id)" style="font-size:13px">🏷 Моя метка</button>
+          <button class="btn-secondary" onclick="shareInviteLink()" style="font-size:13px">👥 Пригласить</button>
+        </div>
         <div class="section-title">Напоминания</div>
         <div class="detail-card" id="dReminders"></div>
         <div id="ownerBtns" style="display:none">
@@ -399,11 +404,11 @@ body{display:flex;flex-direction:column;font-family:'Inter',sans-serif;}
         </div>
       </div>
       <div class="s-section">
-        <div class="s-section-title">Напоминания</div>
+        <div class="s-section-title">Напоминания о годовщине</div>
         <div class="s-card">
-          <div class="s-row" onclick="toggleRemind('day9')"><div class="s-icon">9️⃣</div><div class="s-label">9 дней</div><div class="toggle on" id="tog-day9"><div class="toggle-dot"></div></div></div>
-          <div class="s-row" onclick="toggleRemind('day40')"><div class="s-icon">4️⃣</div><div class="s-label">40 дней</div><div class="toggle on" id="tog-day40"><div class="toggle-dot"></div></div></div>
-          <div class="s-row" onclick="toggleRemind('annual')"><div class="s-icon">📅</div><div class="s-label">Годовщина (каждый год)</div><div class="toggle on" id="tog-annual"><div class="toggle-dot"></div></div></div>
+          <div class="s-row" onclick="toggleRemind('before5')"><div class="s-icon">📅</div><div class="s-label">За 5 дней</div><div class="toggle" id="tog-before5"><div class="toggle-dot"></div></div></div>
+          <div class="s-row" onclick="toggleRemind('before3')"><div class="s-icon">📅</div><div class="s-label">За 3 дня</div><div class="toggle on" id="tog-before3"><div class="toggle-dot"></div></div></div>
+          <div class="s-row" onclick="toggleRemind('annual')"><div class="s-icon">🕯</div><div class="s-label">В день годовщины</div><div class="toggle on" id="tog-annual"><div class="toggle-dot"></div></div></div>
         </div>
       </div>
       <div class="s-section">
@@ -459,7 +464,7 @@ let pendingPhotos    = [];
 let photoPaidUnlocked = false;
 let isPrivate        = false;
 let mapsApp          = localStorage.getItem('mapsApp') || 'google';
-let remindSettings   = JSON.parse(localStorage.getItem('remindSettings') || '{"day9":true,"day40":true,"annual":true}');
+let remindSettings   = JSON.parse(localStorage.getItem('remindSettings') || '{"annual":true,"before3":true,"before5":false}');
 let leafletMap       = null;
 let selectedMapGrave = null;
 let currentSort      = 'alpha';
@@ -470,6 +475,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('sUserId').textContent = USER_ID.substr(0,14);
   applyMapsUI(); applyRemindUI();
   await loadGraves();
+  checkInviteOnLoad();
 });
 
 // ── LOAD ──
@@ -495,7 +501,7 @@ async function loadGraves() {
 // ── RENDER MINE ──
 function renderMine() {
   const q = document.getElementById('mineInput').value.trim().toLowerCase();
-  let list = allGraves.filter(g => g.userId === USER_ID);
+  let list = allGraves.filter(g => g.userId === USER_ID || (g.coAuthors && g.coAuthors.includes(USER_ID)));
   if (q) list = list.filter(g => (g.lastName+' '+g.firstName+' '+(g.patronymic||'')).toLowerCase().includes(q));
   list = sortList(list, mineSort);
   const el = document.getElementById('mineResults');
@@ -524,15 +530,15 @@ function doSearch() { renderSearch(); }
 
 function graveItemHTML(g) {
   const ini = ((g.lastName||'?')[0]+(g.firstName||'?')[0]).toUpperCase();
-  const sec = g.sector ? g.sector+(g.row?', ряд '+g.row:'') : 'Сектор не указан';
-  const priv = g.isPrivate ? '<div class="private-badge">🔒 Приватная</div>' : '';
+  const priv = g.isPrivate ? '<span class="private-badge">🔒</span>' : '';
+  const userTag = getUserTag(g.id);
+  const tagHtml = userTag ? `<span class="tag-chip">${userTag}</span>` : '';
   return `<div class="grave-item" onclick="showDetail('${g.id}')">
     <div class="grave-avatar">${ini}</div>
     <div class="grave-info">
       <div class="grave-name">${g.lastName} ${g.firstName} ${g.patronymic||''}</div>
       <div class="grave-dates">${g.birthYear||'?'} — ${g.deathYear||'?'}</div>
-      <div class="grave-sector">📍 ${sec}</div>
-      ${priv}
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px">${tagHtml}${priv}</div>
     </div>
     <div class="grave-arrow">›</div>
   </div>`;
@@ -840,13 +846,13 @@ function fillDetail(g) {
 function calcReminders(ds) {
   const d = new Date(ds);
   const fmt = x => x.toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
-  const add = (x,n) => { const r=new Date(x); r.setDate(r.getDate()+n); return r; };
   const ty  = x => { const r=new Date(x); r.setFullYear(new Date().getFullYear()); return r; };
-  return [
-    {icon:'9️⃣', label:'9 дней', date:fmt(add(d,9))},
-    {icon:'4️⃣', label:'40 дней', date:fmt(add(d,40))},
-    {icon:'📅', label:'Годовщина (каждый год)', date:fmt(ty(d))}
-  ];
+  const sub = (x,n) => { const r=new Date(x); r.setDate(r.getDate()-n); return r; };
+  const reminders = [];
+  if (remindSettings.before5) reminders.push({icon:'📅', label:'За 5 дней до годовщины', date:fmt(sub(ty(d),5))});
+  if (remindSettings.before3) reminders.push({icon:'📅', label:'За 3 дня до годовщины', date:fmt(sub(ty(d),3))});
+  if (remindSettings.annual)  reminders.push({icon:'🕯', label:'Годовщина (каждый год)', date:fmt(ty(d))});
+  return reminders;
 }
 
 // ── MAPS ──
@@ -866,9 +872,104 @@ function shareGrave() {
     +`${g.birthYear||'?'} — ${g.deathYear||'?'}\n`
     +(g.sector?`Сектор: ${g.sector}${g.row?', ряд '+g.row:''}\n`:'')
     +(g.landmark?`Ориентир: ${g.landmark}\n`:'')
-    +(g.lat&&g.lng?`GPS: https://maps.google.com/?q=${g.lat},${g.lng}`:'');
+    +(g.lat&&g.lng?`GPS: https://maps.google.com/?q=${g.lat},${g.lng}\n`:'')
+    +`\n🌿 Открыть в Memora:\nhttps://t.me/MemoraApp_Bot/MemoraApp`;
   if (navigator.share) navigator.share({text});
   else navigator.clipboard.writeText(text).then(()=>showToast('Скопировано ✓'));
+}
+
+// ── USER TAGS ──────────────────────────────────────────────────
+function getUserTags() {
+  return JSON.parse(localStorage.getItem('userTags') || '{}');
+}
+function getUserTag(graveId) {
+  return getUserTags()[graveId] || null;
+}
+function setUserTag(graveId, tag) {
+  const tags = getUserTags();
+  if (tag) tags[graveId] = tag;
+  else delete tags[graveId];
+  localStorage.setItem('userTags', JSON.stringify(tags));
+}
+
+function showTagModal(graveId) {
+  const current = getUserTag(graveId) || '';
+  showModal('Ваша связь с этим человеком',
+    'Добавьте личную метку — она видна только вам',
+    [
+      {label:'👨‍👩‍👧 Родственник', primary: current==='Родственник', action:()=>{ setUserTag(graveId,'Родственник'); closeModal(); renderMine(); showToast('Метка сохранена'); }},
+      {label:'🤝 Друг', primary: current==='Друг', action:()=>{ setUserTag(graveId,'Друг'); closeModal(); renderMine(); showToast('Метка сохранена'); }},
+      {label:'✏️ Своё название', primary: false, action:()=>{ closeModal(); showCustomTagModal(graveId); }},
+      {label:'Убрать метку', primary: false, action:()=>{ setUserTag(graveId,null); closeModal(); renderMine(); showToast('Метка удалена'); }}
+    ]
+  );
+}
+
+function showCustomTagModal(graveId) {
+  const overlay = document.getElementById('modalOverlay');
+  document.getElementById('modalTitle').textContent = 'Своя метка';
+  document.getElementById('modalSub').textContent = 'Введите название (отец, коллега, сосед...)';
+  const el = document.getElementById('modalBtns'); el.innerHTML = '';
+  const input = document.createElement('input');
+  input.className = 'field-input';
+  input.placeholder = 'Например: отец, бабушка, коллега...';
+  input.value = getUserTag(graveId) || '';
+  input.style.marginBottom = '10px';
+  el.appendChild(input);
+  const btn = document.createElement('button');
+  btn.className = 'modal-btn modal-btn-primary';
+  btn.textContent = 'Сохранить';
+  btn.onclick = () => { if(input.value.trim()) { setUserTag(graveId, input.value.trim()); closeModal(); renderMine(); showToast('Метка сохранена'); } };
+  el.appendChild(btn);
+  const cancel = document.createElement('button');
+  cancel.className = 'modal-btn modal-btn-secondary';
+  cancel.textContent = 'Отмена';
+  cancel.onclick = closeModal;
+  el.appendChild(cancel);
+  overlay.classList.add('show');
+}
+
+// ── COAUTHORSHIP ───────────────────────────────────────────────
+function shareInviteLink() {
+  if (!currentGrave) return;
+  const g = currentGrave;
+  const inviteUrl = `https://t.me/MemoraApp_Bot/MemoraApp?startapp=invite_${g.id}`;
+  const text = `✦ ${g.lastName} ${g.firstName} ${g.patronymic||''}\n`
+    +`${g.birthYear||'?'} — ${g.deathYear||'?'}\n\n`
+    +`Я добавил(а) эту карточку в Memora. Нажми на ссылку чтобы она появилась и у тебя:\n${inviteUrl}`;
+  if (navigator.share) navigator.share({text});
+  else navigator.clipboard.writeText(text).then(()=>showToast('Ссылка скопирована ✓'));
+}
+
+function checkInviteOnLoad() {
+  if (!tg) return;
+  const startParam = tg.initDataUnsafe && tg.initDataUnsafe.start_param;
+  if (startParam && startParam.startsWith('invite_')) {
+    const graveId = startParam.replace('invite_', '');
+    setTimeout(() => acceptInvite(graveId), 1500);
+  }
+}
+
+async function acceptInvite(graveId) {
+  const existing = allGraves.find(g => g.id === graveId);
+  if (!existing) { showToast('Карточка не найдена'); return; }
+  if (existing.coAuthors && existing.coAuthors.includes(USER_ID)) {
+    showToast('Карточка уже в ваших записях'); return; }
+  if (existing.userId === USER_ID) {
+    showToast('Это ваша карточка'); return; }
+  showModal(
+    `Добавить карточку?`,
+    `«${existing.lastName} ${existing.firstName}» появится в ваших записях. Вы сможете добавить личную метку.`,
+    [{label:'Добавить в мои записи', primary:true, action: async ()=>{
+        closeModal();
+        const coAuthors = existing.coAuthors || [];
+        coAuthors.push(USER_ID);
+        await db.collection('graves').doc(graveId).update({ coAuthors });
+        await loadGraves();
+        showTagModal(graveId);
+        showToast('Добавлено в ваши записи ✓');
+    }},{label:'Отмена', primary:false, action:closeModal}]
+  );
 }
 
 // ── EDIT ──
@@ -997,7 +1098,7 @@ function toggleRemind(k) {
   applyRemindUI();
 }
 function applyRemindUI() {
-  ['day9','day40','annual'].forEach(k=>{
+  ['before5','before3','annual'].forEach(k=>{
     const el=document.getElementById('tog-'+k);
     if(el) el.className='toggle '+(remindSettings[k]?'on':'');
   });
