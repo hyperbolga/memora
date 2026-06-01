@@ -60,6 +60,18 @@ body{display:flex;flex-direction:column;font-family:'Inter',sans-serif;}
 .grave-arrow{color:var(--iris);font-size:20px;align-self:center;}
 .private-badge{font-size:10px;background:var(--fog);color:var(--plum);padding:2px 6px;border-radius:99px;display:inline-flex;align-items:center;}
 .tag-chip{font-size:11px;background:var(--plum-deep);color:var(--fog);padding:2px 8px;border-radius:99px;display:inline-flex;align-items:center;}
+.filter-select{padding:6px 10px;border:1px solid var(--linen);border-radius:var(--rs);font-size:13px;background:var(--parchment);color:var(--oak);outline:none;white-space:nowrap;flex-shrink:0;max-width:140px;}
+.filter-select:focus{border-color:var(--plum);}
+.filter-select:disabled{opacity:.45;}
+.privacy-levels{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.privacy-level{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--white);border:1px solid var(--linen);border-radius:var(--rs);cursor:pointer;}
+.privacy-level.selected{border-color:var(--plum);background:var(--fog);}
+.privacy-level-icon{font-size:20px;flex-shrink:0;}
+.privacy-level-info{flex:1;}
+.privacy-level-title{font-size:14px;font-weight:500;color:var(--oak);}
+.privacy-level-sub{font-size:12px;color:var(--sepia);margin-top:2px;}
+.privacy-level-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--linen);flex-shrink:0;}
+.privacy-level.selected .privacy-level-check{background:var(--plum);border-color:var(--plum);}
 
 .empty-state{padding:60px 20px;text-align:center;color:var(--sepia);}
 .empty-icon{font-size:44px;margin-bottom:12px;}
@@ -231,19 +243,37 @@ body{display:flex;flex-direction:column;font-family:'Inter',sans-serif;}
       <div class="search-bar">
         <input class="search-input" id="searchInput" type="text" placeholder="Поиск по фамилии, имени..." oninput="doSearch()"/>
       </div>
-      <div class="sort-bar">
-        <div class="sort-chip active" data-sort="alpha" onclick="setSort('alpha')">А — Я</div>
-        <div class="sort-chip" data-sort="oldest" onclick="setSort('oldest')">Давние → новые</div>
-        <div class="sort-chip" data-sort="newest" onclick="setSort('newest')">Новые → давние</div>
-      </div>
-    </div>
-    <div style="padding:10px 16px 0;background:var(--white);border-bottom:1px solid var(--linen)">
-      <div style="padding:8px 12px;background:var(--fog);border-radius:var(--rs);font-size:12px;color:var(--plum);line-height:1.5;margin-bottom:10px">
-        🌿 Здесь отображаются публичные записи всех пользователей. Это помогает найти захоронения близких и родных на городском кладбище.
+      <div style="padding:0 16px 10px;display:flex;gap:8px;overflow-x:auto;background:var(--white)">
+        <select class="filter-select" id="filterCountry" onchange="onCountryChange()">
+          <option value="">🌍 Страна</option>
+          <option value="Казахстан">Казахстан</option>
+          <option value="Россия">Россия</option>
+          <option value="Узбекистан">Узбекистан</option>
+          <option value="Кыргызстан">Кыргызстан</option>
+          <option value="Таджикистан">Таджикистан</option>
+          <option value="Туркменистан">Туркменистан</option>
+          <option value="Азербайджан">Азербайджан</option>
+          <option value="Армения">Армения</option>
+          <option value="Грузия">Грузия</option>
+          <option value="Беларусь">Беларусь</option>
+          <option value="Украина">Украина</option>
+          <option value="Молдова">Молдова</option>
+          <option value="Другое">Другое</option>
+        </select>
+        <select class="filter-select" id="filterCity" onchange="onCityChange()" disabled>
+          <option value="">🏙 Город</option>
+        </select>
+        <select class="filter-select" id="filterCemetery" onchange="doSearch()" disabled>
+          <option value="">⛪ Кладбище</option>
+        </select>
       </div>
     </div>
     <div class="search-results" id="searchResults">
-      <div class="loading"><div class="spinner"></div>Загрузка...</div>
+      <div class="empty-state">
+        <div class="empty-icon">🌿</div>
+        <div class="empty-title">Найдите захоронение</div>
+        <div class="empty-sub">Выберите страну и город<br>чтобы найти публичные записи</div>
+      </div>
     </div>
   </div>
 
@@ -252,6 +282,38 @@ body{display:flex;flex-direction:column;font-family:'Inter',sans-serif;}
     <div class="add-scroll">
       <div id="addBanner" class="banner banner-free">✦ Бесплатных слотов: <strong id="freeLeft">2</strong> из 2</div>
 
+      <!-- МЕСТО ЗАХОРОНЕНИЯ -->
+      <div class="field-group">
+        <div class="field-label">Страна *</div>
+        <select class="field-input" id="f_country" onchange="updateCityOptions()">
+          <option value="">Выберите страну</option>
+          <option value="Казахстан">Казахстан</option>
+          <option value="Россия">Россия</option>
+          <option value="Узбекистан">Узбекистан</option>
+          <option value="Кыргызстан">Кыргызстан</option>
+          <option value="Таджикистан">Таджикистан</option>
+          <option value="Туркменистан">Туркменистан</option>
+          <option value="Азербайджан">Азербайджан</option>
+          <option value="Армения">Армения</option>
+          <option value="Грузия">Грузия</option>
+          <option value="Беларусь">Беларусь</option>
+          <option value="Украина">Украина</option>
+          <option value="Молдова">Молдова</option>
+          <option value="Другое">Другое</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field-group">
+          <div class="field-label">Город *</div>
+          <input class="field-input" id="f_city" type="text" placeholder="Костанай"/>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Название кладбища *</div>
+          <input class="field-input" id="f_cemetery" type="text" placeholder="Городское кладбище"/>
+        </div>
+      </div>
+
+      <!-- ФИО -->
       <div class="field-group">
         <div class="field-label">Фамилия *</div>
         <input class="field-input" id="f_last" type="text" placeholder="Чечулин"/>
@@ -295,13 +357,77 @@ body{display:flex;flex-direction:column;font-family:'Inter',sans-serif;}
         <input class="field-input" id="f_land" type="text" placeholder="Рядом с берёзой, у центральной аллеи..."/>
       </div>
 
-      <!-- ПРИВАТНОСТЬ -->
-      <div class="privacy-row" onclick="togglePrivacy()">
-        <div class="privacy-info">
-          <div class="privacy-title">🔒 Приватная запись</div>
-          <div class="privacy-sub" id="privacySubText">Видите только вы. Включите чтобы скрыть от других.</div>
+      <!-- РУ И ЖУЗ -->
+      <div class="field-row">
+        <div class="field-group">
+          <div class="field-label">Жуз</div>
+          <select class="field-input" id="f_zhuz">
+            <option value="">Не указан</option>
+            <option value="Старший жуз (Ұлы жүз)">Старший жуз</option>
+            <option value="Средний жуз (Орта жүз)">Средний жуз</option>
+            <option value="Младший жуз (Кіші жүз)">Младший жуз</option>
+          </select>
         </div>
-        <div class="toggle" id="privacyToggle"><div class="toggle-dot"></div></div>
+        <div class="field-group">
+          <div class="field-label">Ру (род)</div>
+          <select class="field-input" id="f_ru">
+            <option value="">Не указан</option>
+            <optgroup label="Старший жуз">
+              <option>Дулат</option><option>Албан</option><option>Суан</option>
+              <option>Шапырашты</option><option>Ысты</option><option>Сиқым</option>
+              <option>Ошақты</option><option>Шанышқылы</option><option>Жалайыр</option>
+            </optgroup>
+            <optgroup label="Средний жуз">
+              <option>Арғын</option><option>Найман</option><option>Қыпшақ</option>
+              <option>Қоңырат</option><option>Уақ</option><option>Керей</option>
+              <option>Таракты</option>
+            </optgroup>
+            <optgroup label="Младший жуз">
+              <option>Алимулы</option><option>Байулы</option><option>Жетіру</option>
+              <option>Адай</option><option>Жаппас</option><option>Алшын</option>
+              <option>Берш</option><option>Шеркеш</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+
+      <!-- СТАТУС ДОБАВЛЯЮЩЕГО -->
+      <div class="field-group">
+        <div class="field-label">Ваша связь с этим человеком</div>
+        <select class="field-input" id="f_status">
+          <option value="close">👨‍👩‍👧 Близкий / родственник</option>
+          <option value="found">🗺 Нашёл случайно</option>
+          <option value="historic">🏛 Историческая / известная личность</option>
+        </select>
+      </div>
+
+      <!-- ПРИВАТНОСТЬ — ТРИ УРОВНЯ -->
+      <div class="field-label" style="margin-bottom:8px">Уровень доступа</div>
+      <div class="privacy-levels">
+        <div class="privacy-level selected" id="pl-private" onclick="setPrivacyLevel('private')">
+          <div class="privacy-level-icon">🔒</div>
+          <div class="privacy-level-info">
+            <div class="privacy-level-title">Личный</div>
+            <div class="privacy-level-sub">Вижу только я</div>
+          </div>
+          <div class="privacy-level-check"></div>
+        </div>
+        <div class="privacy-level" id="pl-family" onclick="setPrivacyLevel('family')">
+          <div class="privacy-level-icon">👨‍👩‍👧</div>
+          <div class="privacy-level-info">
+            <div class="privacy-level-title">Семейный</div>
+            <div class="privacy-level-sub">По ссылке-приглашению для семьи и рода</div>
+          </div>
+          <div class="privacy-level-check"></div>
+        </div>
+        <div class="privacy-level" id="pl-public" onclick="setPrivacyLevel('public')">
+          <div class="privacy-level-icon">🌐</div>
+          <div class="privacy-level-info">
+            <div class="privacy-level-title">Публичный</div>
+            <div class="privacy-level-sub">Доступен всем в разделе Поиск</div>
+          </div>
+          <div class="privacy-level-check"></div>
+        </div>
       </div>
 
       <!-- ФОТО -->
@@ -360,6 +486,7 @@ body{display:flex;flex-direction:column;font-family:'Inter',sans-serif;}
           <div class="d-row"><div class="d-icon">🗺</div><div class="d-label">Сектор / ряд</div><div class="d-value" id="dSector">—</div></div>
           <div class="d-row"><div class="d-icon">📍</div><div class="d-label">Координаты</div><div class="d-value" id="dCoords">—</div></div>
           <div class="d-row"><div class="d-icon">🌿</div><div class="d-label">Ориентир</div><div class="d-value" id="dLand">—</div></div>
+          <div class="d-row" id="dRowZhuzRu"><div class="d-icon">🌀</div><div class="d-label">Жуз · Ру</div><div class="d-value" id="dZhuzRu">—</div></div>
         </div>
         <div class="action-btns">
           <button class="btn-primary" onclick="openMaps()">🧭 Маршрут</button>
@@ -462,7 +589,7 @@ let currentGrave     = null;
 let userCardCount    = 0;
 let pendingPhotos    = [];
 let photoPaidUnlocked = false;
-let isPrivate        = false;
+let privacyLevel     = 'private'; // 'private' | 'family' | 'public'
 let mapsApp          = localStorage.getItem('mapsApp') || 'google';
 let remindSettings   = JSON.parse(localStorage.getItem('remindSettings') || '{"annual":true,"before3":true,"before5":false}');
 let leafletMap       = null;
@@ -501,7 +628,7 @@ async function loadGraves() {
 // ── RENDER MINE ──
 function renderMine() {
   const q = document.getElementById('mineInput').value.trim().toLowerCase();
-  let list = allGraves.filter(g => g.userId === USER_ID || (g.coAuthors && g.coAuthors.includes(USER_ID)));
+  let list = allGraves.filter(g => g.userId === USER_ID || (g.coAuthors && g.coAuthors.includes(USER_ID)) || (g.privacyLevel==='family' && g.coAuthors && g.coAuthors.includes(USER_ID)));
   if (q) list = list.filter(g => (g.lastName+' '+g.firstName+' '+(g.patronymic||'')).toLowerCase().includes(q));
   list = sortList(list, mineSort);
   const el = document.getElementById('mineResults');
@@ -514,13 +641,26 @@ function renderMine() {
 
 // ── RENDER SEARCH (публичные) ──
 function renderSearch() {
-  const q = document.getElementById('searchInput').value.trim().toLowerCase();
-  let list = allGraves.filter(g => !g.isPrivate || g.userId === USER_ID);
-  if (q) list = list.filter(g => (g.lastName+' '+g.firstName+' '+(g.patronymic||'')).toLowerCase().includes(q));
+  const countryEl  = document.getElementById('filterCountry');
+  const cityEl     = document.getElementById('filterCity');
+  const cemEl      = document.getElementById('filterCemetery');
+  const country    = countryEl ? countryEl.value : '';
+  const city       = cityEl ? cityEl.value : '';
+  const cemetery   = cemEl ? cemEl.value : '';
+  const q          = document.getElementById('searchInput').value.trim().toLowerCase();
+  const el         = document.getElementById('searchResults');
+  if (!country) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🌿</div><div class="empty-title">Найдите захоронение</div><div class="empty-sub">Выберите страну и город<br>чтобы найти публичные записи</div></div>';
+    return;
+  }
+  let list = allGraves.filter(g => g.privacyLevel==='public' || (!g.privacyLevel && !g.isPrivate));
+  if (country)  list = list.filter(g => g.country === country);
+  if (city)     list = list.filter(g => g.city === city);
+  if (cemetery) list = list.filter(g => g.cemetery === cemetery);
+  if (q)        list = list.filter(g => (g.lastName+' '+g.firstName+' '+(g.patronymic||'')).toLowerCase().includes(q));
   list = sortList(list, currentSort);
-  const el = document.getElementById('searchResults');
   if (!list.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🌿</div><div class="empty-title">Ничего не найдено</div><div class="empty-sub">Попробуйте изменить запрос</div></div>';
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🌿</div><div class="empty-title">Ничего не найдено</div><div class="empty-sub">Попробуйте изменить фильтры или имя</div></div>';
     return;
   }
   el.innerHTML = list.map(g => graveItemHTML(g)).join('');
@@ -528,17 +668,44 @@ function renderSearch() {
 
 function doSearch() { renderSearch(); }
 
+function onCountryChange() {
+  const country = document.getElementById('filterCountry').value;
+  const cityEl  = document.getElementById('filterCity');
+  const cemEl   = document.getElementById('filterCemetery');
+  cityEl.innerHTML = '<option value="">🏙 Город</option>';
+  cemEl.innerHTML  = '<option value="">⛪ Кладбище</option>';
+  cemEl.disabled   = true;
+  if (!country) { cityEl.disabled=true; renderSearch(); return; }
+  const cities = [...new Set(allGraves.filter(g=>(g.privacyLevel==='public'||(!g.privacyLevel&&!g.isPrivate))&&g.country===country&&g.city).map(g=>g.city))].sort();
+  cities.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; cityEl.appendChild(o); });
+  cityEl.disabled = cities.length === 0;
+  renderSearch();
+}
+
+function onCityChange() {
+  const country = document.getElementById('filterCountry').value;
+  const city    = document.getElementById('filterCity').value;
+  const cemEl   = document.getElementById('filterCemetery');
+  cemEl.innerHTML = '<option value="">⛪ Кладбище</option>';
+  if (!city) { cemEl.disabled=true; renderSearch(); return; }
+  const cems = [...new Set(allGraves.filter(g=>(g.privacyLevel==='public'||(!g.privacyLevel&&!g.isPrivate))&&g.country===country&&g.city===city&&g.cemetery).map(g=>g.cemetery))].sort();
+  cems.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; cemEl.appendChild(o); });
+  cemEl.disabled = cems.length === 0;
+  renderSearch();
+}
+
 function graveItemHTML(g) {
   const ini = ((g.lastName||'?')[0]+(g.firstName||'?')[0]).toUpperCase();
-  const priv = g.isPrivate ? '<span class="private-badge">🔒</span>' : '';
-  const userTag = getUserTag(g.id);
-  const tagHtml = userTag ? `<span class="tag-chip">${userTag}</span>` : '';
+  const priv = g.privacyLevel === 'private' ? '<span class="private-badge">🔒</span>' : g.privacyLevel === 'family' ? '<span class="private-badge">👨‍👩‍👧</span>' : '';
+  const loc = [g.country, g.city, g.cemetery].filter(Boolean).join(' · ');
+  const locHtml = loc ? `<div class="grave-sector">📍 ${loc}</div>` : '';
   return `<div class="grave-item" onclick="showDetail('${g.id}')">
     <div class="grave-avatar">${ini}</div>
     <div class="grave-info">
       <div class="grave-name">${g.lastName} ${g.firstName} ${g.patronymic||''}</div>
       <div class="grave-dates">${g.birthYear||'?'} — ${g.deathYear||'?'}</div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px">${tagHtml}${priv}</div>
+      ${locHtml}
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:2px">${priv}</div>
     </div>
     <div class="grave-arrow">›</div>
   </div>`;
@@ -564,13 +731,12 @@ function setMineSort(s) {
 }
 
 // ── PRIVACY ──
-function togglePrivacy() {
-  isPrivate = !isPrivate;
-  const tog = document.getElementById('privacyToggle');
-  tog.className = 'toggle ' + (isPrivate ? 'on' : '');
-  document.getElementById('privacySubText').textContent = isPrivate
-    ? 'Видите только вы. Запись скрыта от других пользователей.'
-    : 'Видите только вы. Включите чтобы скрыть от других.';
+function setPrivacyLevel(level) {
+  privacyLevel = level;
+  ['private','family','public'].forEach(l => {
+    const el = document.getElementById('pl-'+l);
+    if (el) el.className = 'privacy-level' + (l===level?' selected':'');
+  });
 }
 
 // ── PHOTOS ──
@@ -769,11 +935,18 @@ async function saveGrave() {
       birthYear:  document.getElementById('f_birth').value||null,
       deathYear:  death,
       deathDate:  document.getElementById('f_deathDate').value||null,
+      country:    document.getElementById('f_country').value||null,
+      city:       document.getElementById('f_city').value.trim()||null,
+      cemetery:   document.getElementById('f_cemetery').value.trim()||null,
       sector:     document.getElementById('f_sector').value.trim(),
       row:        document.getElementById('f_row').value.trim(),
       landmark:   document.getElementById('f_land').value.trim(),
+      zhuz:       document.getElementById('f_zhuz').value||null,
+      ru:         document.getElementById('f_ru').value||null,
+      status:     document.getElementById('f_status').value||'close',
       lat, lng, photos: photoUrls,
-      isPrivate,
+      privacyLevel,
+      isPrivate: privacyLevel === 'private',
       photoPack: photoPaidUnlocked,
       userId: USER_ID, userName: USER_NAME,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -790,11 +963,11 @@ async function saveGrave() {
 }
 
 function resetForm() {
-  ['f_last','f_first','f_mid','f_birth','f_death','f_deathDate','f_sector','f_row','f_land','f_lat','f_lng']
-    .forEach(id => document.getElementById(id).value='');
+  ['f_last','f_first','f_mid','f_birth','f_death','f_deathDate','f_country','f_city','f_cemetery','f_sector','f_row','f_land','f_lat','f_lng','f_zhuz','f_ru']
+    .forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('gpsResult').style.display='none';
-  pendingPhotos=[]; photoPaidUnlocked=false; isPrivate=false;
-  document.getElementById('privacyToggle').className='toggle';
+  pendingPhotos=[]; photoPaidUnlocked=false; privacyLevel='private';
+  setPrivacyLevel('private');
   document.getElementById('photosScroll').innerHTML='<div class="photo-add-btn" onclick="addPhoto()"><span>📷</span><small>Добавить</small></div>';
   document.getElementById('photoBanner').className='photo-banner free';
   document.getElementById('photoBanner').textContent='📷 1 фото бесплатно · пакет до 5 фото = 1$ (Telegram Stars)';
@@ -826,7 +999,10 @@ function showDetail(id) {
 
 function fillDetail(g) {
   document.getElementById('detailName').textContent = `${g.lastName} ${g.firstName} ${g.patronymic||''}`;
-  document.getElementById('detailLife').textContent = `${g.birthYear||'?'} — ${g.deathYear||'?'}`;
+  const lifeText = `${g.birthYear||'?'} — ${g.deathYear||'?'}`;
+  const locText = [g.country, g.city, g.cemetery].filter(Boolean).join(' · ');
+  const statusText = g.status==='found'?'🗺 Нашёл случайно':g.status==='historic'?'🏛 Историческая личность':'';
+  document.getElementById('detailLife').textContent = lifeText + (locText ? ' · '+locText : '') + (statusText ? ' · '+statusText : '');
   const wrap = document.getElementById('detailPhotosWrap');
   if (g.photos && g.photos.length) {
     wrap.innerHTML = `<div class="detail-photos">${g.photos.map(u=>`<img src="${u}" class="detail-photo-img"/>`).join('')}</div>`;
@@ -836,6 +1012,8 @@ function fillDetail(g) {
   document.getElementById('dSector').textContent = g.sector ? g.sector+(g.row?', ряд '+g.row:'') : '—';
   document.getElementById('dCoords').textContent  = g.lat&&g.lng ? `${Number(g.lat).toFixed(5)}, ${Number(g.lng).toFixed(5)}` : '—';
   document.getElementById('dLand').textContent    = g.landmark||'—';
+  const zhuzRuEl = document.getElementById('dZhuzRu');
+  if (zhuzRuEl) zhuzRuEl.textContent = [g.zhuz, g.ru].filter(Boolean).join(' · ') || '—';
   document.getElementById('ownerBtns').style.display = (g.userId===USER_ID||!TG_USER) ? 'block' : 'none';
   const remDiv = document.getElementById('dReminders');
   remDiv.innerHTML = g.deathDate
@@ -1022,7 +1200,15 @@ async function updateGrave(id) {
       sector:     document.getElementById('f_sector').value.trim(),
       row:        document.getElementById('f_row').value.trim(),
       landmark:   document.getElementById('f_land').value.trim(),
-      lat, lng, photos: photoUrls, isPrivate,
+      country:    document.getElementById('f_country').value||null,
+      city:       document.getElementById('f_city').value.trim()||null,
+      cemetery:   document.getElementById('f_cemetery').value.trim()||null,
+      zhuz:       document.getElementById('f_zhuz').value||null,
+      ru:         document.getElementById('f_ru').value||null,
+      status:     document.getElementById('f_status').value||'close',
+      lat, lng, photos: photoUrls,
+      privacyLevel,
+      isPrivate: privacyLevel === 'private',
     });
     showToast('Запись обновлена ✓');
     btn.textContent = 'Сохранить запись';
